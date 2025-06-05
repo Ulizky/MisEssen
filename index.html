@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Stock y Catálogo de Productos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@0.395.0/dist/umd/lucide.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F7F4; /* Fondo neutro cálido */
+            color: #374151; /* Color de texto por defecto */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px; 
+            max-height: 350px;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D1C7B8; 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #B9AD9B;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            padding: 1rem;
+        }
+        .modal-backdrop.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem; 
+            border-radius: 0.75rem; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            width: 90%;
+            max-width: 600px; 
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .icon {
+            width: 1.10rem; 
+            height: 1.10rem; 
+            stroke-width: 2;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.3rem;
+        }
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem; 
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem; 
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .btn-primary {
+            background-color: #E86A33; 
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #D45F2A;
+        }
+        .btn-secondary {
+            background-color: #4A403A; 
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #3A302A;
+        }
+        .btn-neutral {
+            background-color: #D1C7B8;
+            color: #4A403A;
+        }
+        .btn-neutral:hover {
+            background-color: #B9AD9B;
+        }
+        .btn-danger {
+            background-color: #F56565; 
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #E53E3E; 
+        }
+        .btn-success {
+            background-color: #34D399; /* Tailwind green-400 */
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #10B981; /* Tailwind green-500 */
+        }
+        .product-card-placeholder {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            text-align: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            background-color: #e2e8f0; 
+            color: #4a5568;
+            border-radius: 0.375rem 0.375rem 0 0;
+        }
+        .catalog-sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        @media (max-width: 768px) {
+            .catalog-sidebar.hidden-mobile {
+                transform: translateX(-100%);
+            }
+        }
+        .table-action-btn {
+            padding: 0.4rem 0.6rem; 
+            border-radius: 0.375rem; 
+            font-size: 0.875rem; 
+            margin: 0 0.125rem; 
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="app-container" class="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <nav class="bg-white shadow-md rounded-xl mb-6 p-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
+                <h1 class="text-2xl font-bold text-[#4A403A]">Sistema de Gestión</h1>
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button id="nav-panel-control" class="btn btn-secondary"><i data-lucide="layout-dashboard"></i>Panel de Control</button>
+                    <button id="nav-add-product" class="btn btn-primary"><i data-lucide="plus-circle"></i>Añadir Producto</button>
+                    <button id="nav-catalog" class="btn btn-neutral"><i data-lucide="book-open"></i>Ver Catálogo</button>
+                </div>
+            </div>
+        </nav>
+
+        <div id="panel-control-view" class="space-y-8">
+            <header class="mb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-3xl font-bold text-[#4A403A]">Panel de Control</h2>
+                    <p class="text-md text-gray-500">Un resumen de tu inventario.</p>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                     <input type="file" id="import-csv-file" class="hidden" accept=".csv" onchange="handleImportCSV(event)">
+                     <button onclick="document.getElementById('import-csv-file').click()" class="btn btn-success w-full sm:w-auto"><i data-lucide="upload-cloud"></i>Importar CSV</button>
+                     <button id="export-csv-btn" class="btn btn-success w-full sm:w-auto"><i data-lucide="download-cloud"></i>Exportar CSV</button>
+                </div>
+            </header>
+
+            <div id="summary-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase flex items-center"><i data-lucide="dollar-sign" class="icon text-green-500"></i>Valor Total del Stock</h3>
+                    <p id="total-stock-value" class="text-3xl font-bold text-[#4A403A] mt-2">$0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase flex items-center"><i data-lucide="package" class="icon text-blue-500"></i>Productos Únicos</h3>
+                    <p id="unique-products-count" class="text-3xl font-bold text-[#4A403A] mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase flex items-center"><i data-lucide="boxes" class="icon text-purple-500"></i>Total de Unidades</h3>
+                    <p id="total-units-count" class="text-3xl font-bold text-[#4A403A] mt-2">0</p>
+                </div>
+                 <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase flex items-center"><i data-lucide="alert-circle" class="icon text-yellow-500"></i>Stock Bajo (Menos de 5)</h3>
+                    <p id="low-stock-count" class="text-3xl font-bold text-red-500 mt-2">0</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 text-[#4A403A]">Listado de Productos</h2>
+                    <div class="mb-4">
+                        <input type="text" id="search-product-panel" placeholder="Buscar por nombre, categoría, línea o código..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E86A33]">
+                    </div>
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase">Nombre</th>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase">Categoría</th>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase">Línea</th>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase text-center">Stock</th>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase text-right">Precio Venta</th>
+                                    <th class="p-3 text-xs font-semibold tracking-wider uppercase text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="product-table-body" class="divide-y divide-gray-200">
+                            </tbody>
+                        </table>
+                        <p id="no-products-message-panel" class="text-center py-8 text-gray-500 hidden">No hay productos para mostrar.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h2 class="text-xl font-bold mb-4 text-[#4A403A]">Stock por Categoría</h2>
+                        <div class="chart-container">
+                            <canvas id="stock-by-category-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h2 class="text-xl font-bold mb-4 text-[#4A403A]">Stock por Línea</h2>
+                        <div class="chart-container">
+                            <canvas id="stock-by-line-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h2 class="text-xl font-bold mb-4 text-[#4A403A]">Últimos Productos Añadidos</h2>
+                        <ul id="timeline-list" class="space-y-3 max-h-64 overflow-y-auto">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="add-edit-product-view" class="hidden">
+            <header class="mb-6">
+                <h2 id="form-title" class="text-3xl font-bold text-[#4A403A]">Añadir Nuevo Producto</h2>
+                <p id="form-subtitle" class="text-md text-gray-500">Completa los detalles del producto.</p>
+            </header>
+            
+            <form id="product-form" class="bg-white p-6 md:p-8 rounded-xl shadow-2xl space-y-6">
+                <input type="hidden" id="product_id">
+                <div id="product-suggestions" class="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded-md text-sm hidden">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="categoria-producto" class="block text-sm font-medium text-gray-700 mb-1">Categoría <span class="text-red-500">*</span></label>
+                        <select id="categoria-producto" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required>
+                            <option value="">Seleccione una categoría...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="linea-producto" class="block text-sm font-medium text-gray-700 mb-1">Línea/Colección <span class="text-red-500">*</span></label>
+                        <select id="linea-producto" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required>
+                            <option value="">Seleccione una línea...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="nombre-producto" class="block text-sm font-medium text-gray-700 mb-1">Nombre/Modelo Específico <span class="text-red-500">*</span></label>
+                    <input type="text" id="nombre-producto" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required placeholder="Ej: Cacerola 24cm, Taza Grande">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="codigo-producto" class="block text-sm font-medium text-gray-700 mb-1">Código de Producto (SKU)</label>
+                        <input type="text" id="codigo-producto" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: CAC24AQUA">
+                    </div>
+                    <div>
+                        <label for="stock-actual" class="block text-sm font-medium text-gray-700 mb-1">Cantidad en Stock <span class="text-red-500">*</span></label>
+                        <input type="number" id="stock-actual" min="0" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required placeholder="0">
+                    </div>
+                    <div>
+                        <label for="precio-venta" class="block text-sm font-medium text-gray-700 mb-1">Precio de Venta <span class="text-red-500">*</span></label>
+                        <input type="number" step="0.01" id="precio-venta" min="0" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="precio-costo" class="block text-sm font-medium text-gray-700 mb-1">Precio de Costo (opcional)</label>
+                        <input type="number" step="0.01" id="precio-costo" min="0" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label for="capacidad-litros" class="block text-sm font-medium text-gray-700 mb-1">Capacidad (L, opcional)</label>
+                        <input type="number" step="0.1" id="capacidad-litros" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: 2.1">
+                    </div>
+                    <div>
+                        <label for="comensales" class="block text-sm font-medium text-gray-700 mb-1">Comensales (opcional)</label>
+                        <input type="number" id="comensales" min="1" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: 2">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="dimensiones-cm" class="block text-sm font-medium text-gray-700 mb-1">Dimensiones (cm, opcional)</label>
+                        <input type="text" id="dimensiones-cm" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: 24cm diámetro, 30x20x10cm">
+                    </div>
+                    <div>
+                        <label for="material-recubrimiento" class="block text-sm font-medium text-gray-700 mb-1">Material/Recubrimiento</label>
+                        <input type="text" id="material-recubrimiento" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: Aluminio con antiadherente">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="color-especifico" class="block text-sm font-medium text-gray-700 mb-1">Color Específico</label>
+                        <input type="text" id="color-especifico" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: Celeste Aqua, Rojo Intenso">
+                    </div>
+                    <div>
+                        <label for="origen-producto" class="block text-sm font-medium text-gray-700 mb-1">Origen</label>
+                        <input type="text" id="origen-producto" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: Argentina, China">
+                    </div>
+                     <div>
+                        <label for="fecha-ingreso" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Ingreso <span class="text-red-500">*</span></label>
+                        <input type="date" id="fecha-ingreso" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" required>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="imagen-url" class="block text-sm font-medium text-gray-700 mb-1">URL de Imagen (opcional)</label>
+                    <input type="url" id="imagen-url" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="https://example.com/imagen.jpg">
+                </div>
+
+                <div>
+                    <label for="descripcion-atractiva" class="block text-sm font-medium text-gray-700 mb-1">Descripción Atractiva/Corta</label>
+                    <textarea id="descripcion-atractiva" rows="2" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: Ideal para tus comidas diarias, diseño moderno."></textarea>
+                </div>
+                <div>
+                    <label for="notas-adicionales" class="block text-sm font-medium text-gray-700 mb-1">Notas Adicionales</label>
+                    <textarea id="notas-adicionales" rows="2" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#E86A33] focus:border-[#E86A33] sm:text-sm" placeholder="Ej: Incluye espátula, promoción especial."></textarea>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row justify-end items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
+                    <button type="button" id="generate-random-product-btn" class="btn btn-neutral order-first sm:order-none w-full sm:w-auto"><i data-lucide="shuffle"></i>Generar Aleatorio (Test)</button>
+                    <button type="button" id="preview-product-btn" class="btn btn-secondary w-full sm:w-auto"><i data-lucide="eye"></i>Previsualizar</button>
+                    <button type="submit" id="save-product-btn" class="btn btn-primary w-full sm:w-auto"><i data-lucide="save"></i>Guardar Producto</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="catalog-view" class="hidden">
+            <div class="flex flex-col md:flex-row min-h-[calc(100vh-200px)]"> 
+                <aside id="catalog-sidebar" class="catalog-sidebar fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl p-4 transform md:translate-x-0 hidden-mobile md:static md:block md:flex-shrink-0 mt-16 md:mt-0"> 
+                    <div class="mb-6 text-center">
+                        <h3 class="text-2xl font-bold text-[#4A403A]">Catálogo</h3>
+                        <p class="text-sm text-gray-500">Explora los productos</p>
+                    </div>
+                    <nav id="catalog-category-nav">
+                        <ul class="space-y-2">
+                        </ul>
+                    </nav>
+                </aside>
+
+                <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+                    <button id="catalog-menu-toggle-btn" class="md:hidden fixed top-20 left-4 z-50 p-2 bg-[#E86A33] text-white rounded-md">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    
+                    <div id="catalog-welcome-section" class="mb-8 p-6 bg-white rounded-lg shadow">
+                         <h2 class="text-2xl font-bold text-[#4A403A] mb-3">Bienvenido al Catálogo de Productos</h2>
+                         <p class="text-gray-600">Aquí puedes encontrar una variedad de productos disponibles. Utiliza el menú lateral para filtrar por categoría.</p>
+                    </div>
+
+                    <div id="catalog-product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    </div>
+                    <p id="no-products-message-catalog" class="text-center py-8 text-gray-500 hidden">No hay productos para mostrar en esta categoría.</p>
+                </main>
+            </div>
+        </div>
+
+        <div id="details-modal" class="modal-backdrop">
+            <div class="modal-content">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="details-modal-title" class="text-xl font-bold text-[#4A403A]">Detalles del Producto</h3>
+                    <button id="close-details-modal-btn" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
+                </div>
+                <div id="details-modal-body" class="space-y-2 text-sm text-gray-700">
+                </div>
+                 <div class="mt-6 flex justify-end gap-3">
+                    <button id="whatsapp-share-btn" class="btn btn-success"><i data-lucide="message-circle"></i>Compartir por WhatsApp</button>
+                    <button id="details-modal-close-footer-btn" class="btn btn-neutral">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-confirm-modal" class="modal-backdrop">
+            <div class="modal-content">
+                <h3 class="text-xl font-bold text-[#4A403A] mb-4">Confirmar Eliminación</h3>
+                <p id="delete-confirm-message" class="mb-6 text-gray-700">¿Estás seguro?</p>
+                <div class="flex justify-end gap-4">
+                    <button id="cancel-delete-btn" class="btn btn-neutral">Cancelar</button>
+                    <button id="confirm-delete-btn" class="btn btn-danger">Eliminar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="alert-modal" class="modal-backdrop">
+            <div class="modal-content">
+                 <div class="flex justify-between items-center mb-3">
+                    <h3 id="alert-modal-title" class="text-xl font-semibold">Notificación</h3>
+                    <button onclick="closeModal('alert-modal')" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
+                </div>
+                <p id="alert-modal-message" class="mb-4"></p>
+                <div class="text-right">
+                    <button onclick="closeModal('alert-modal')" class="btn btn-primary">Entendido</button>
+                </div>
+            </div>
+        </div>
+
+    </div> 
+    
+    <footer class="text-center p-4 bg-gray-800 text-white text-sm mt-12">
+        <p>&copy; <span id="currentYear"></span> Sistema de Gestión de Productos. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+    // --- Estado Global y Datos ---
+    let products = [];
+    let productIdCounter = 0;
+    let currentView = 'panel-control'; 
+    let currentEditingProductId = null;
+    let productToDeleteId = null;
+    let productToShareId = null; // Para compartir por WhatsApp
+
+    let productCategories = ["Cacerola", "Sartén", "Flip", "Cuadrada", "Bifera", "Wok", "Jarro", "Fuente", "Utensilio", "Accesorio", "Textil", "Limpieza", "Otro"];
+    let productLines = ["Clásica", "Contemporánea", "Premium", "Económica", "Profesional", "Decorativa", "Sin Línea Específica"];
+
+    let stockByCategoryChart = null;
+    let stockByLineChart = null;
+
+    // --- Elementos del DOM ---
+    const panelControlView = document.getElementById('panel-control-view');
+    const addEditProductView = document.getElementById('add-edit-product-view');
+    const catalogView = document.getElementById('catalog-view');
+    
+    const navPanelControlBtn = document.getElementById('nav-panel-control');
+    const navAddProductBtn = document.getElementById('nav-add-product');
+    const navCatalogBtn = document.getElementById('nav-catalog');
+    
+    const totalStockValueEl = document.getElementById('total-stock-value');
+    const uniqueProductsCountEl = document.getElementById('unique-products-count');
+    const totalUnitsCountEl = document.getElementById('total-units-count');
+    const lowStockCountEl = document.getElementById('low-stock-count');
+    const productTableBody = document.getElementById('product-table-body');
+    const searchInputPanel = document.getElementById('search-product-panel');
+    const timelineListEl = document.getElementById('timeline-list');
+    const noProductsMessagePanel = document.getElementById('no-products-message-panel');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+        
+    const productForm = document.getElementById('product-form');
+    const formTitle = document.getElementById('form-title');
+    const formSubtitle = document.getElementById('form-subtitle');
+    const productIdInput = document.getElementById('product_id');
+    const categoriaSelect = document.getElementById('categoria-producto');
+    const lineaSelect = document.getElementById('linea-producto');
+    const productSuggestionsEl = document.getElementById('product-suggestions');
+    const generateRandomBtn = document.getElementById('generate-random-product-btn');
+    const previewProductBtn = document.getElementById('preview-product-btn');
+    const saveProductBtn = document.getElementById('save-product-btn');
+    const fechaIngresoInput = document.getElementById('fecha-ingreso');
+    
+    const catalogCategoryNav = document.getElementById('catalog-category-nav').querySelector('ul');
+    const catalogProductGrid = document.getElementById('catalog-product-grid');
+    const catalogWelcomeSection = document.getElementById('catalog-welcome-section');
+    const noProductsMessageCatalog = document.getElementById('no-products-message-catalog');
+    const catalogMenuToggleBtn = document.getElementById('catalog-menu-toggle-btn');
+    const catalogSidebar = document.getElementById('catalog-sidebar');
+    
+    const detailsModal = document.getElementById('details-modal');
+    const detailsModalTitle = document.getElementById('details-modal-title');
+    const detailsModalBody = document.getElementById('details-modal-body');
+    const closeDetailsModalBtn = document.getElementById('close-details-modal-btn');
+    const detailsModalCloseFooterBtn = document.getElementById('details-modal-close-footer-btn');
+    const whatsappShareBtn = document.getElementById('whatsapp-share-btn');
+
+    const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+    const deleteConfirmMessage = document.getElementById('delete-confirm-message');
+    const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+    const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+    const alertModal = document.getElementById('alert-modal');
+    const alertModalTitle = document.getElementById('alert-modal-title');
+    const alertModalMessage = document.getElementById('alert-modal-message');
+    
+    // --- Inicialización ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProductsFromLocalStorage();
+        lucide.createIcons();
+        setupEventListeners();
+        populateSelects();
+        navigateToView('panel-control'); 
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    });
+
+    function setupEventListeners() {
+        navPanelControlBtn.addEventListener('click', () => navigateToView('panel-control'));
+        navAddProductBtn.addEventListener('click', () => navigateToView('add-edit-product'));
+        navCatalogBtn.addEventListener('click', () => navigateToView('catalog'));
+
+        productForm.addEventListener('submit', handleFormSubmit);
+        generateRandomBtn.addEventListener('click', generateRandomProduct);
+        previewProductBtn.addEventListener('click', previewProduct);
+        if(fechaIngresoInput) fechaIngresoInput.valueAsDate = new Date(); 
+
+        searchInputPanel.addEventListener('input', () => renderPanelProductList(getFilteredProductsPanel()));
+        exportCsvBtn.addEventListener('click', exportToCSV);
+
+        catalogMenuToggleBtn.addEventListener('click', () => catalogSidebar.classList.toggle('hidden-mobile'));
+
+        closeDetailsModalBtn.addEventListener('click', () => closeModal('details-modal'));
+        detailsModalCloseFooterBtn.addEventListener('click', () => closeModal('details-modal'));
+        detailsModal.addEventListener('click', (e) => { if (e.target === detailsModal) closeModal('details-modal'); });
+        whatsappShareBtn.addEventListener('click', shareProductOnWhatsApp);
+
+        cancelDeleteBtn.addEventListener('click', () => closeModal('delete-confirm-modal'));
+        confirmDeleteBtn.addEventListener('click', executeDeleteProduct);
+        deleteConfirmModal.addEventListener('click', (e) => { if (e.target === deleteConfirmModal) closeModal('delete-confirm-modal'); });
+        
+        alertModal.addEventListener('click', (e) => { if (e.target === alertModal) closeModal('alert-modal'); });
+    }
+
+    // --- Navegación entre Vistas ---
+    function navigateToView(viewName, productId = null) {
+        currentView = viewName;
+        [panelControlView, addEditProductView, catalogView].forEach(v => v.classList.add('hidden'));
+
+        // Reset button styles
+        const navButtons = [navPanelControlBtn, navAddProductBtn, navCatalogBtn];
+        navButtons.forEach(btn => {
+            btn.classList.remove('bg-[#D45F2A]', 'bg-[#3A302A]', 'bg-[#B9AD9B]'); // Remove active/hover specific colors
+            // Ensure base style is present
+            if (btn.id === 'nav-add-product' && !btn.classList.contains('btn-primary')) btn.classList.add('btn-primary');
+            else if (btn.id === 'nav-panel-control' && !btn.classList.contains('btn-secondary')) btn.classList.add('btn-secondary');
+            else if (btn.id === 'nav-catalog' && !btn.classList.contains('btn-neutral')) btn.classList.add('btn-neutral');
+        });
+        
+        // Determine active button and apply its active style (using hover color for active state)
+        let activeBtn;
+        if (viewName === 'panel-control') {
+            panelControlView.classList.remove('hidden');
+            activeBtn = navPanelControlBtn;
+            if (activeBtn) activeBtn.classList.add('bg-[#3A302A]'); // Active color for secondary
+            renderPanelControl();
+        } else if (viewName === 'add-edit-product') {
+            addEditProductView.classList.remove('hidden');
+            activeBtn = navAddProductBtn;
+            if (activeBtn) activeBtn.classList.add('bg-[#D45F2A]'); // Active color for primary
+            setupProductForm(productId);
+        } else if (viewName === 'catalog') {
+            catalogView.classList.remove('hidden');
+            activeBtn = navCatalogBtn;
+            if (activeBtn) activeBtn.classList.add('bg-[#B9AD9B]'); // Active color for neutral
+            renderCatalog();
+        }
+        lucide.createIcons(); 
+        window.scrollTo(0, 0); 
+    }
+
+    // --- Persistencia de Datos (LocalStorage) ---
+    function saveProductsToLocalStorage() {
+        try {
+            localStorage.setItem('productsInventory', JSON.stringify(products));
+            localStorage.setItem('productIdCounter', productIdCounter.toString());
+        } catch (e) {
+            console.error("Error saving to localStorage:", e);
+            showAlert("Error de Guardado", "No se pudo guardar la información en el almacenamiento local. El navegador podría estar en modo privado o el almacenamiento lleno.");
+        }
+    }
+
+    function loadProductsFromLocalStorage() {
+        // Load products
+        try {
+            const storedProducts = localStorage.getItem('productsInventory');
+            if (storedProducts) {
+                products = JSON.parse(storedProducts).map(p => ({
+                    ...p,
+                    id: typeof p.id === 'number' ? p.id : (parseInt(p.id, 10) || 0), // Ensure ID is a number
+                    stock_actual: parseInt(p.stock_actual, 10) || 0, 
+                    precio_venta: parseFloat(p.precio_venta) || 0,
+                    precio_costo: p.precio_costo ? parseFloat(p.precio_costo) : null, // Keep null if originally null/empty
+                    capacidad_litros: p.capacidad_litros ? parseFloat(p.capacidad_litros) : null,
+                    comensales: p.comensales ? parseInt(p.comensales, 10) : null
+                }));
+            } else {
+                products = [];
+            }
+        } catch (e) {
+            console.error("Error loading products from localStorage:", e);
+            products = [];
+            // showAlert("Error de Carga", "No se pudieron cargar los productos guardados. Empezando de cero.");
+            // localStorage.removeItem('productsInventory'); // Optional: clear corrupted data
+        }
+
+        // Load and validate productIdCounter
+        productIdCounter = 0; // Default initialization
+        try {
+            const storedCounter = localStorage.getItem('productIdCounter');
+            if (storedCounter) {
+                const parsedCounter = parseInt(storedCounter, 10);
+                if (!isNaN(parsedCounter)) {
+                    productIdCounter = parsedCounter;
+                } else {
+                    console.warn("productIdCounter from localStorage was NaN.");
+                }
+            }
+        } catch (e) {
+            console.error("Error loading productIdCounter from localStorage:", e);
+            // localStorage.removeItem('productIdCounter'); // Optional: clear corrupted data
+        }
+
+        // Ensure productIdCounter is at least the max ID currently in products
+        if (products.length > 0) {
+            const maxExistingId = Math.max(0, ...products.map(p => (typeof p.id === 'number' ? p.id : 0) ));
+            productIdCounter = Math.max(productIdCounter, maxExistingId);
+        }
+    }
+
+
+    // --- Lógica del Panel de Control ---
+    function renderPanelControl() {
+        renderSummaryMetrics();
+        renderPanelProductList(getFilteredProductsPanel()); // Initial render with all products or current filter
+        renderPanelCharts();
+        renderTimeline();
+    }
+
+    function renderSummaryMetrics() {
+        const totalValue = products.reduce((sum, p) => sum + ((parseFloat(p.precio_venta) || 0) * (parseInt(p.stock_actual, 10) || 0)), 0);
+        const totalUnits = products.reduce((sum, p) => sum + (parseInt(p.stock_actual, 10) || 0), 0);
+        const lowStockItems = products.filter(p => (parseInt(p.stock_actual, 10) || 0) < 5).length;
+
+        totalStockValueEl.textContent = `$${totalValue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        uniqueProductsCountEl.textContent = products.length;
+        totalUnitsCountEl.textContent = totalUnits;
+        lowStockCountEl.textContent = lowStockItems; 
+    }
+
+    function getFilteredProductsPanel() {
+        const searchTerm = searchInputPanel.value.toLowerCase().trim();
+        if (!searchTerm) return [...products]; // Return a copy
+        return products.filter(p =>
+            (p.nombre_producto && p.nombre_producto.toLowerCase().includes(searchTerm)) ||
+            (p.categoria && p.categoria.toLowerCase().includes(searchTerm)) ||
+            (p.linea && p.linea.toLowerCase().includes(searchTerm)) ||
+            (p.codigo_producto && p.codigo_producto.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    function renderPanelProductList(productsToRender) {
+        productTableBody.innerHTML = '';
+        if (productsToRender.length === 0) {
+            noProductsMessagePanel.classList.remove('hidden');
+            productTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-500">No hay productos que coincidan con la búsqueda.</td></tr>`;
+            return;
+        }
+        noProductsMessagePanel.classList.add('hidden');
+
+        // Sort products by name by default for consistent display, can be changed
+        const sortedProducts = [...productsToRender].sort((a, b) => a.nombre_producto.localeCompare(b.nombre_producto));
+
+
+        sortedProducts.forEach(p => {
+            const stock = parseInt(p.stock_actual, 10) || 0;
+            const row = document.createElement('tr');
+            row.className = `hover:bg-gray-50 ${stock < 5 && stock > 0 ? 'bg-yellow-50' : stock === 0 ? 'bg-red-50' : ''}`;
+            row.innerHTML = `
+                <td class="p-3 text-sm text-gray-700 font-medium">${p.nombre_producto}</td>
+                <td class="p-3 text-sm text-gray-500">${p.categoria}</td>
+                <td class="p-3 text-sm text-gray-500">${p.linea}</td>
+                <td class="p-3 text-sm text-gray-700 text-center font-bold ${stock < 5 && stock > 0 ? 'text-yellow-600' : stock === 0 ? 'text-red-600' : ''}">${stock}</td>
+                <td class="p-3 text-sm text-gray-700 text-right font-semibold">$${(parseFloat(p.precio_venta) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="p-3 text-sm text-center whitespace-nowrap">
+                    <button class="btn table-action-btn btn-neutral" onclick="viewProductDetails(${p.id})" title="Ver Detalles"><i data-lucide="eye"></i></button>
+                    <button class="btn table-action-btn btn-secondary" onclick="navigateToView('add-edit-product', ${p.id})" title="Editar"><i data-lucide="edit-2"></i></button>
+                    <button class="btn table-action-btn btn-danger" onclick="confirmDeleteProduct(${p.id})" title="Eliminar"><i data-lucide="trash-2"></i></button>
+                    <button class="btn table-action-btn btn-success" onclick="prepareShareProduct(${p.id})" title="Compartir por WhatsApp"><i data-lucide="message-circle"></i></button>
+                </td>
+            `;
+            productTableBody.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function renderPanelCharts() {
+        const categoryData = products.reduce((acc, p) => {
+            acc[p.categoria] = (acc[p.categoria] || 0) + (parseInt(p.stock_actual,10) || 0);
+            return acc;
+        }, {});
+        const lineData = products.reduce((acc, p) => {
+            acc[p.linea] = (acc[p.linea] || 0) + (parseInt(p.stock_actual,10) || 0);
+            return acc;
+        }, {});
+
+        const chartColors = ['#E86A33', '#4A403A', '#D1C7B8', '#F4A261', '#E76F51', '#2A9D8F', '#264653', '#e9c46a', '#f4a261', '#e76f51'];
+
+        const catCtx = document.getElementById('stock-by-category-chart').getContext('2d');
+        if (stockByCategoryChart) stockByCategoryChart.destroy();
+        if (Object.keys(categoryData).length > 0 && Object.values(categoryData).some(v => v > 0)) {
+            document.getElementById('stock-by-category-chart').style.display = 'block';
+            stockByCategoryChart = new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categoryData),
+                    datasets: [{
+                        label: 'Stock por Categoría',
+                        data: Object.values(categoryData),
+                        backgroundColor: chartColors,
+                        borderColor: '#F8F7F4',
+                        borderWidth: 2
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { 
+                            position: 'right', 
+                            align: 'center',    
+                            labels: { padding: 8, boxWidth: 10, font: { size: 10 } } 
+                        } 
+                    } 
+                }
+            });
+        } else {
+             document.getElementById('stock-by-category-chart').style.display = 'none';
+             catCtx.clearRect(0, 0, catCtx.canvas.width, catCtx.canvas.height); 
+        }
+
+        const lineCtx = document.getElementById('stock-by-line-chart').getContext('2d');
+        if (stockByLineChart) stockByLineChart.destroy();
+         if (Object.keys(lineData).length > 0 && Object.values(lineData).some(v => v > 0)) {
+            document.getElementById('stock-by-line-chart').style.display = 'block';
+            stockByLineChart = new Chart(lineCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(lineData),
+                    datasets: [{
+                        label: 'Stock por Línea',
+                        data: Object.values(lineData),
+                        backgroundColor: chartColors[1], 
+                        borderColor: chartColors[1],
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        } else {
+            document.getElementById('stock-by-line-chart').style.display = 'none';
+            lineCtx.clearRect(0, 0, lineCtx.canvas.width, lineCtx.canvas.height); 
+        }
+    }
+    
+    function renderTimeline() {
+        timelineListEl.innerHTML = '';
+        const sortedProducts = [...products].sort((a,b) => new Date(b.fecha_adicion) - new Date(a.fecha_adicion));
+        sortedProducts.slice(0, 7).forEach(p => { 
+            const item = `
+                <li class="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-md">
+                    <div class="mt-1.5 flex-shrink-0 h-3 w-3 rounded-full bg-[#E86A33] border-2 border-white shadow"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">${p.nombre_producto}</p>
+                        <time class="text-xs text-gray-500">${new Date(p.fecha_adicion).toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'})}</time>
+                    </div>
+                </li>`;
+            timelineListEl.innerHTML += item;
+        });
+         if(sortedProducts.length === 0) {
+            timelineListEl.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-4">No hay productos recientes.</p>`;
+        }
+    }
+
+    // --- Lógica del Formulario de Producto ---
+    function populateSelects() {
+        const currentCatValue = categoriaSelect.value;
+        const currentLineValue = lineaSelect.value;
+
+        categoriaSelect.innerHTML = '<option value="">Seleccione una categoría...</option>';
+        productCategories.sort().forEach(cat => { 
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            categoriaSelect.appendChild(option);
+        });
+        if (productCategories.includes(currentCatValue)) categoriaSelect.value = currentCatValue;
+
+
+        lineaSelect.innerHTML = '<option value="">Seleccione una línea...</option>';
+        productLines.sort().forEach(line => { 
+            const option = document.createElement('option');
+            option.value = line;
+            option.textContent = line;
+            lineaSelect.appendChild(option);
+        });
+        if (productLines.includes(currentLineValue)) lineaSelect.value = currentLineValue;
+    }
+
+    function setupProductForm(productId = null) {
+        productForm.reset();
+        if(fechaIngresoInput) fechaIngresoInput.valueAsDate = new Date(); 
+        productIdInput.value = '';
+        currentEditingProductId = productId;
+
+        if (productId !== null) { // Explicitly check for null
+            formTitle.textContent = 'Editar Producto';
+            formSubtitle.textContent = 'Modifica los detalles del producto seleccionado.';
+            saveProductBtn.innerHTML = '<i data-lucide="save"></i>Guardar Cambios';
+            const product = products.find(p => p.id === productId);
+            if (product) {
+                productIdInput.value = product.id;
+                document.getElementById('categoria-producto').value = product.categoria;
+                document.getElementById('linea-producto').value = product.linea;
+                document.getElementById('nombre-producto').value = product.nombre_producto;
+                document.getElementById('codigo-producto').value = product.codigo_producto || '';
+                document.getElementById('stock-actual').value = product.stock_actual;
+                document.getElementById('precio-venta').value = product.precio_venta;
+                document.getElementById('precio-costo').value = product.precio_costo || '';
+                document.getElementById('capacidad-litros').value = product.capacidad_litros || '';
+                document.getElementById('comensales').value = product.comensales || '';
+                document.getElementById('dimensiones-cm').value = product.dimensiones_cm || '';
+                document.getElementById('material-recubrimiento').value = product.material_recubrimiento || '';
+                document.getElementById('color-especifico').value = product.color_especifico || '';
+                document.getElementById('origen-producto').value = product.origen_producto || '';
+                document.getElementById('fecha-ingreso').value = product.fecha_ingreso;
+                document.getElementById('imagen-url').value = product.imagen_url || '';
+                document.getElementById('descripcion-atractiva').value = product.descripcion_atractiva || '';
+                document.getElementById('notas-adicionales').value = product.notas_adicionales || '';
+            } else {
+                 showAlert("Error", "No se encontró el producto para editar.");
+                 navigateToView('panel-control'); // Go back if product not found
+                 return;
+            }
+        } else {
+            formTitle.textContent = 'Añadir Nuevo Producto';
+            formSubtitle.textContent = 'Completa los detalles del nuevo producto.';
+            saveProductBtn.innerHTML = '<i data-lucide="plus-circle"></i>Añadir Producto';
+        }
+        updateProductSuggestions();
+        lucide.createIcons();
+    }
+
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        const id = currentEditingProductId !== null ? parseInt(currentEditingProductId) : ++productIdCounter;
+        
+        const productData = {
+            id: id,
+            categoria: document.getElementById('categoria-producto').value,
+            linea: document.getElementById('linea-producto').value,
+            nombre_producto: document.getElementById('nombre-producto').value.trim(),
+            codigo_producto: document.getElementById('codigo-producto').value.trim(),
+            stock_actual: parseInt(document.getElementById('stock-actual').value, 10) || 0, 
+            precio_venta: parseFloat(document.getElementById('precio-venta').value) || 0, 
+            precio_costo: document.getElementById('precio-costo').value ? parseFloat(document.getElementById('precio-costo').value) : null,
+            capacidad_litros: document.getElementById('capacidad-litros').value ? parseFloat(document.getElementById('capacidad-litros').value) : null,
+            comensales: document.getElementById('comensales').value ? parseInt(document.getElementById('comensales').value, 10) : null,
+            dimensiones_cm: document.getElementById('dimensiones-cm').value.trim(),
+            material_recubrimiento: document.getElementById('material-recubrimiento').value.trim(),
+            color_especifico: document.getElementById('color-especifico').value.trim(),
+            origen_producto: document.getElementById('origen-producto').value.trim(),
+            fecha_ingreso: document.getElementById('fecha-ingreso').value,
+            imagen_url: document.getElementById('imagen-url').value.trim(),
+            descripcion_atractiva: document.getElementById('descripcion-atractiva').value.trim(),
+            notas_adicionales: document.getElementById('notas-adicionales').value.trim(),
+            fecha_adicion: (currentEditingProductId !== null && products.find(p => p.id === id)?.fecha_adicion) ? products.find(p => p.id === id).fecha_adicion : new Date().toISOString()
+        };
+
+        // Basic validation for required fields (though HTML 'required' should catch most)
+        if (!productData.nombre_producto || !productData.categoria || !productData.linea || !productData.fecha_ingreso) {
+            showAlert("Campos Requeridos", "Por favor, complete todos los campos obligatorios (*).");
+            return;
+        }
+
+
+        if (productData.categoria && !productCategories.includes(productData.categoria)) {
+            productCategories.push(productData.categoria);
+        }
+        if (productData.linea && !productLines.includes(productData.linea)) {
+            productLines.push(productData.linea);
+        }
+        populateSelects(); // Update selects if new cat/line added
+
+        if (currentEditingProductId !== null) {
+            const productIndex = products.findIndex(p => p.id === id);
+            if (productIndex > -1) {
+                products[productIndex] = productData;
+            }
+            showAlert("¡Actualizado!", `Producto "${productData.nombre_producto}" actualizado correctamente.`);
+        } else {
+            products.push(productData);
+            showAlert("¡Éxito!", `Producto "${productData.nombre_producto}" añadido correctamente.`);
+        }
+        
+        saveProductsToLocalStorage();
+        navigateToView('panel-control');
+    }
+    
+    function updateProductSuggestions() {
+        if (products.length === 0) {
+            productSuggestionsEl.classList.add('hidden');
+            return;
+        }
+        const lastProduct = products[products.length - 1];
+        let suggestionText = `Sugerencia: El último producto añadido fue de categoría '${lastProduct.categoria}' y línea '${lastProduct.linea}'.`;
+        if (products.some(p => (parseInt(p.stock_actual,10) || 0) < 5)) {
+            suggestionText += " Algunos productos tienen stock bajo, ¡considere reponerlos!";
+        }
+        productSuggestionsEl.textContent = suggestionText;
+        productSuggestionsEl.classList.remove('hidden');
+    }
+
+    function generateRandomProduct() {
+        const localRandomCats = ["Cacerola", "Sartén", "Accesorio de Cocina", "Decoración Hogar", "Textil Baño", "Vajilla", "Olla a Presión", "Molde Repostería"];
+        const localRandomLines = ["Moderno", "Rústico", "Minimalista", "Vintage", "Industrial", "Bohemio", "Gourmet", "Country"];
+        const randomNames = ["Deluxe", "Pro", "Esencial", "Único", "Clásico", "Elegante", "Práctico", "ChefMaster"];
+        const randomColors = ["Rojo", "Azul", "Verde", "Negro", "Blanco", "Plata", "Dorado", "Gris", "Cobre", "Turquesa"];
+
+        const cat = localRandomCats[Math.floor(Math.random() * localRandomCats.length)];
+        const line = localRandomLines[Math.floor(Math.random() * localRandomLines.length)];
+        const namePart = randomNames[Math.floor(Math.random() * randomNames.length)];
+        const color = randomColors[Math.floor(Math.random() * randomColors.length)];
+        
+        // 1. Add to global arrays if new
+        let newCategoryAdded = false;
+        if (!productCategories.includes(cat)) {
+            productCategories.push(cat);
+            newCategoryAdded = true;
+        }
+        let newLineAdded = false;
+        if (!productLines.includes(line)) {
+            productLines.push(line);
+            newLineAdded = true;
+        }
+
+        // 2. Repopulate selects if new options were added to global arrays
+        //    This ensures the <option> exists before we try to set it.
+        //    populateSelects also sorts the arrays.
+        if (newCategoryAdded || newLineAdded) {
+            populateSelects(); 
+        }
+        
+        // 3. Now set the values for category and line
+        document.getElementById('categoria-producto').value = cat;
+        document.getElementById('linea-producto').value = line;
+        
+        // Set other random values
+        document.getElementById('nombre-producto').value = `${cat} ${namePart} ${Math.floor(Math.random() * 30 + 10)}cm ${color}`;
+        document.getElementById('codigo-producto').value = `SKU${Math.floor(Math.random() * 90000 + 10000)}`;
+        document.getElementById('stock-actual').value = Math.floor(Math.random() * 50) + 1;
+        document.getElementById('precio-venta').value = (Math.random() * 100 + 20).toFixed(2);
+        document.getElementById('precio-costo').value = (parseFloat(document.getElementById('precio-venta').value) * (Math.random() * 0.4 + 0.4)).toFixed(2); 
+        document.getElementById('capacidad-litros').value = (Math.random() * 5 + 1).toFixed(1);
+        document.getElementById('comensales').value = Math.floor(Math.random() * 6) + 1;
+        document.getElementById('dimensiones-cm').value = `${Math.floor(Math.random() * 20 + 10)}cm x ${Math.floor(Math.random() * 20 + 10)}cm`;
+        document.getElementById('material-recubrimiento').value = "Acero Inoxidable con Triple Fondo";
+        document.getElementById('color-especifico').value = color;
+        document.getElementById('origen-producto').value = "Nacional";
+        document.getElementById('fecha-ingreso').valueAsDate = new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000); 
+        document.getElementById('descripcion-atractiva').value = "Un producto excelente y versátil para múltiples usos en el hogar moderno.";
+        document.getElementById('notas-adicionales').value = "Generado aleatoriamente para prueba. Oferta por tiempo limitado.";
+        document.getElementById('imagen-url').value = `https://placehold.co/300x200/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${encodeURIComponent(cat.substring(0,10))}`;
+
+        showAlert("Datos Aleatorios Cargados", "Se han cargado datos de ejemplo en el formulario.");
+    }
+    
+    function previewProduct() {
+        const productData = { 
+            id: "PREVIEW", // Special ID for preview
+            categoria: document.getElementById('categoria-producto').value,
+            linea: document.getElementById('linea-producto').value,
+            nombre_producto: document.getElementById('nombre-producto').value,
+            codigo_producto: document.getElementById('codigo-producto').value,
+            stock_actual: parseInt(document.getElementById('stock-actual').value, 10) || 0,
+            precio_venta: parseFloat(document.getElementById('precio-venta').value) || 0,
+            precio_costo: document.getElementById('precio-costo').value ? parseFloat(document.getElementById('precio-costo').value) : null,
+            capacidad_litros: document.getElementById('capacidad-litros').value ? parseFloat(document.getElementById('capacidad-litros').value) : null,
+            comensales: document.getElementById('comensales').value ? parseInt(document.getElementById('comensales').value, 10) : null,
+            dimensiones_cm: document.getElementById('dimensiones-cm').value,
+            material_recubrimiento: document.getElementById('material-recubrimiento').value,
+            color_especifico: document.getElementById('color-especifico').value,
+            origen_producto: document.getElementById('origen-producto').value,
+            fecha_ingreso: document.getElementById('fecha-ingreso').value,
+            imagen_url: document.getElementById('imagen-url').value,
+            descripcion_atractiva: document.getElementById('descripcion-atractiva').value,
+            notas_adicionales: document.getElementById('notas-adicionales').value,
+            fecha_adicion: new Date().toISOString() 
+        };
+        displayProductDetails(productData, "Previsualización del Producto", true); // true for isPreview
+    }
+
+
+    // --- Lógica del Catálogo ---
+    function renderCatalog() {
+        renderCatalogCategories();
+        renderCatalogProducts('all'); 
+        const allProductsLink = catalogCategoryNav.querySelector('a[data-category="all"]');
+        if (allProductsLink) {
+            document.querySelectorAll('#catalog-category-nav .catalog-nav-link').forEach(el => el.classList.remove('bg-gray-300', 'text-[#4A403A]', 'font-semibold'));
+            allProductsLink.classList.add('bg-gray-300', 'text-[#4A403A]', 'font-semibold');
+        }
+    }
+
+    function renderCatalogCategories() {
+        catalogCategoryNav.innerHTML = ''; 
+        
+        const allProductsLi = document.createElement('li');
+        const allProductsLink = document.createElement('a');
+        allProductsLink.href = "#";
+        allProductsLink.dataset.category = "all";
+        allProductsLink.className = "catalog-nav-link block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-200 font-medium";
+        allProductsLink.textContent = "Todos los Productos";
+        allProductsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            renderCatalogProducts("all");
+            document.querySelectorAll('#catalog-category-nav .catalog-nav-link').forEach(el => el.classList.remove('bg-gray-300', 'text-[#4A403A]', 'font-semibold'));
+            allProductsLink.classList.add('bg-gray-300', 'text-[#4A403A]', 'font-semibold');
+            if (window.innerWidth < 768) { 
+                catalogSidebar.classList.add('hidden-mobile');
+            }
+        });
+        allProductsLi.appendChild(allProductsLink);
+        catalogCategoryNav.appendChild(allProductsLi);
+
+        const uniqueCategories = [...new Set(products.map(p => p.categoria))].sort();
+        
+        uniqueCategories.forEach(category => {
+            const li = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = "#";
+            link.dataset.category = category;
+            link.className = "catalog-nav-link block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-200";
+            link.textContent = category;
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                renderCatalogProducts(category);
+                document.querySelectorAll('#catalog-category-nav .catalog-nav-link').forEach(el => el.classList.remove('bg-gray-300', 'text-[#4A403A]', 'font-semibold'));
+                link.classList.add('bg-gray-300', 'text-[#4A403A]', 'font-semibold');
+                if (window.innerWidth < 768) {
+                    catalogSidebar.classList.add('hidden-mobile');
+                }
+            });
+            li.appendChild(link);
+            catalogCategoryNav.appendChild(li);
+        });
+    }
+
+    function renderCatalogProducts(categoryFilter = 'all') {
+        catalogProductGrid.innerHTML = '';
+        catalogWelcomeSection.classList.toggle('hidden', categoryFilter !== 'all' || products.length === 0);
+        
+        const filteredProducts = categoryFilter === 'all' ? products : products.filter(p => p.categoria === categoryFilter);
+
+        if (filteredProducts.length === 0) {
+            noProductsMessageCatalog.textContent = categoryFilter === 'all' ? 'No hay productos en el catálogo. ¡Añade algunos!' : `No hay productos para mostrar en la categoría "${categoryFilter}".`;
+            noProductsMessageCatalog.classList.remove('hidden');
+            catalogProductGrid.classList.add('hidden');
+            if (categoryFilter === 'all') catalogWelcomeSection.classList.remove('hidden'); // Show welcome if all products is empty
+            return;
+        }
+        noProductsMessageCatalog.classList.add('hidden');
+        catalogProductGrid.classList.remove('hidden');
+
+        filteredProducts.forEach(product => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col';
+            
+            const placeholderText = encodeURIComponent(product.nombre_producto.substring(0,15));
+            const placeholderImage = product.imagen_url || `https://placehold.co/300x200/E2E8F0/4A5568?text=${placeholderText}`;
+            const stock = parseInt(product.stock_actual, 10) || 0;
+
+            card.innerHTML = `
+                <div class="product-card-placeholder" style="background-image: url('${product.imagen_url || 'https://placehold.co/1x1/transparent/transparent'}'); background-size: cover; background-position: center; background-repeat: no-repeat;" 
+                     onerror="this.style.backgroundImage='url(https://placehold.co/300x200/E2E8F0/4A5568?text=${placeholderText})'; this.innerHTML = '${!product.imagen_url ? `<span>${product.nombre_producto.substring(0,15)}</span>` : ''}';">
+                     ${!product.imagen_url ? `<span>${product.nombre_producto.substring(0,15)}</span>` : ''}
+                </div>
+                <div class="p-4 flex flex-col flex-grow">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-1 truncate" title="${product.nombre_producto}">${product.nombre_producto}</h3>
+                    <p class="text-xs text-gray-500 mb-2">${product.categoria} ${product.linea ? '- ' + product.linea : ''}</p>
+                    <p class="text-sm text-gray-600 mb-3 flex-grow min-h-[40px]">${(product.descripcion_atractiva || 'Click para más detalles').substring(0,60)}${(product.descripcion_atractiva && product.descripcion_atractiva.length > 60) ? '...' : ''}</p>
+                    <p class="text-xl font-bold text-[#E86A33] mb-1">$${(parseFloat(product.precio_venta) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p class="text-xs mb-3 ${stock === 0 ? 'text-red-500 font-semibold' : stock < 5 ? 'text-yellow-600 font-semibold' : 'text-green-600'}">Stock: ${stock === 0 ? 'Agotado' : stock < 5 ? `¡Solo quedan ${stock}!` : `${stock} disponibles`}</p>
+                    <button onclick="viewProductDetails(${product.id})" class="mt-auto w-full btn btn-secondary text-sm view-details-btn"><i data-lucide="search"></i>Ver Detalles</button>
+                </div>
+            `;
+            // Image error handling for product card background
+            const imgDiv = card.querySelector('.product-card-placeholder');
+            if (product.imagen_url) {
+                const tempImg = new Image();
+                tempImg.src = product.imagen_url;
+                tempImg.onerror = () => {
+                    imgDiv.style.backgroundImage = `url(https://placehold.co/300x200/E2E8F0/4A5568?text=${placeholderText})`;
+                    imgDiv.innerHTML = `<span>${product.nombre_producto.substring(0,15)}</span>`;
+                };
+            }
+
+            catalogProductGrid.appendChild(card);
+        });
+        lucide.createIcons();
+    }
+
+    // --- Acciones CRUD y Modales ---
+    function viewProductDetails(productId) {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            productToShareId = productId; 
+            displayProductDetails(product, `Detalles de: ${product.nombre_producto}`);
+        } else {
+            showAlert("Error", "Producto no encontrado.");
+        }
+    }
+    
+    function displayProductDetails(product, title, isPreview = false) {
+        detailsModalTitle.textContent = title;
+        whatsappShareBtn.style.display = isPreview ? 'none' : 'inline-flex';
+
+        let detailsHtml = `<dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">`;
+        const stock = parseInt(product.stock_actual, 10) || 0;
+        const fieldsToShow = [
+            { label: "ID", value: product.id === "PREVIEW" ? "<i>N/A (Previsualización)</i>" : product.id },
+            { label: "Nombre", value: product.nombre_producto },
+            { label: "Categoría", value: product.categoria },
+            { label: "Línea", value: product.linea },
+            { label: "Código (SKU)", value: product.codigo_producto },
+            { label: "Stock", value: stock, class: stock === 0 ? 'text-red-600 font-bold' : stock < 5 ? 'text-yellow-600 font-bold' : '' },
+            { label: "Precio Venta", value: `$${(parseFloat(product.precio_venta) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+            { label: "Precio Costo", value: product.precio_costo ? `$${(parseFloat(product.precio_costo) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null },
+            { label: "Capacidad", value: product.capacidad_litros ? `${product.capacidad_litros} L` : null },
+            { label: "Comensales", value: product.comensales || null },
+            { label: "Dimensiones", value: product.dimensiones_cm || null },
+            { label: "Material/Recub.", value: product.material_recubrimiento || null },
+            { label: "Color Específico", value: product.color_especifico || null },
+            { label: "Origen", value: product.origen_producto || null },
+            { label: "Fecha Ingreso", value: product.fecha_ingreso ? formatearFecha(product.fecha_ingreso) : null },
+        ];
+        if (product.id !== "PREVIEW") { 
+             fieldsToShow.push({ label: "Fecha Adición Sistema", value: product.fecha_adicion ? formatearFechaHora(product.fecha_adicion) : null });
+        }
+
+
+        fieldsToShow.forEach(field => {
+            if (field.value !== undefined && field.value !== null && String(field.value).trim() !== '') { 
+                 detailsHtml += `<div class="col-span-1 py-1 border-b border-gray-100"><dt class="font-semibold text-gray-600">${field.label}:</dt><dd class="text-gray-800 ${field.class || ''}">${field.value}</dd></div>`;
+            }
+        });
+        
+        detailsHtml += `</dl>`;
+        
+        if (product.descripcion_atractiva) {
+            detailsHtml += `<div class="mt-3 pt-2 border-t"><dt class="font-semibold text-gray-600">Descripción:</dt><dd class="text-gray-800 whitespace-pre-wrap">${product.descripcion_atractiva}</dd></div>`;
+        }
+        if (product.notas_adicionales) {
+            detailsHtml += `<div class="mt-2 pt-2 border-t"><dt class="font-semibold text-gray-600">Notas Adicionales:</dt><dd class="text-gray-800 whitespace-pre-wrap">${product.notas_adicionales}</dd></div>`;
+        }
+        if (product.imagen_url) {
+            detailsHtml += `<div class="mt-4 pt-3 border-t"><dt class="font-semibold text-gray-600 mb-1">Imagen:</dt><img src="${product.imagen_url}" alt="${product.nombre_producto}" class="rounded-md max-h-60 w-auto mx-auto shadow" onerror="this.src='https://placehold.co/300x200/E2E8F0/4A5568?text=Imagen+no+disponible'; this.alt='Imagen no disponible'; this.onerror=null;"></div>`;
+        }
+
+        detailsModalBody.innerHTML = detailsHtml;
+        openModal('details-modal');
+    }
+    
+    function confirmDeleteProduct(productId) {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            productToDeleteId = productId;
+            deleteConfirmMessage.textContent = `¿Estás seguro de que deseas eliminar "${product.nombre_producto}"? Esta acción no se puede deshacer.`;
+            openModal('delete-confirm-modal');
+        }
+    }
+
+    function executeDeleteProduct() {
+        if (productToDeleteId !== null) {
+            const productName = products.find(p => p.id === productToDeleteId)?.nombre_producto || "El producto";
+            products = products.filter(p => p.id !== productToDeleteId);
+            productToDeleteId = null;
+            closeModal('delete-confirm-modal');
+            saveProductsToLocalStorage();
+            showAlert("Eliminado", `${productName} ha sido eliminado.`);
+            if (currentView === 'panel-control') renderPanelControl();
+            else if (currentView === 'catalog') renderCatalog();
+            else if (currentView === 'add-edit-product') navigateToView('panel-control'); // If deleting from edit form (not typical)
+        }
+    }
+    
+    // --- Utilidades de Modales ---
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+        lucide.createIcons(); 
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+         if (modalId === 'details-modal') { 
+            productToShareId = null;
+        }
+    }
+
+    function showAlert(title, message) {
+        alertModalTitle.textContent = title;
+        alertModalMessage.textContent = message;
+        openModal('alert-modal');
+    }
+    
+    // --- Utilidades de Formato de Fecha ---
+    function formatearFecha(fechaString) {
+        if (!fechaString) return 'N/A';
+        // Handles YYYY-MM-DD format from <input type="date">
+        const parts = fechaString.split('-');
+        if (parts.length === 3) {
+            const dateObj = new Date(parts[0], parts[1] - 1, parts[2]); // Month is 0-indexed
+             if (!isNaN(dateObj.getTime())) { // Check if date is valid
+                return dateObj.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+        }
+        // Fallback for other date string formats if necessary, or return original
+        try {
+            const dateObjAttempt = new Date(fechaString);
+            if (!isNaN(dateObjAttempt.getTime())) {
+                 return dateObjAttempt.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+        } catch (e) { /* ignore error, return original */ }
+        return fechaString; 
+    }
+
+    function formatearFechaHora(fechaISOString) {
+        if (!fechaISOString) return 'N/A';
+        const dateObj = new Date(fechaISOString);
+         if (isNaN(dateObj.getTime())) return fechaISOString; // Return original if invalid date
+        return dateObj.toLocaleString('es-AR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // --- Funciones de Exportar/Importar CSV ---
+    function exportToCSV() {
+        if (products.length === 0) {
+            showAlert("Exportar CSV", "No hay productos para exportar.");
+            return;
+        }
+        const headers = [
+            "id", "nombre_producto", "categoria", "linea", "codigo_producto", 
+            "stock_actual", "precio_venta", "precio_costo", "capacidad_litros", 
+            "comensales", "dimensiones_cm", "material_recubrimiento", "color_especifico", 
+            "origen_producto", "fecha_ingreso", "imagen_url", "descripcion_atractiva", 
+            "notas_adicionales", "fecha_adicion"
+        ];
+        let csvContent = headers.join(",") + "\n";
+
+        products.forEach(product => {
+            const row = headers.map(header => {
+                let value = product[header] === null || product[header] === undefined ? "" : String(product[header]);
+                if (value.includes(",") || value.includes("\n") || value.includes("\"")) {
+                     value = `"${value.replace(/"/g, '""')}"`; // Escape quotes and wrap in quotes
+                }
+                return value;
+            });
+            csvContent += row.join(",") + "\n";
+        });
+
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "inventario_productos.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        showAlert("Exportar CSV", "La descarga del archivo CSV ha comenzado.");
+    }
+
+    function handleImportCSV(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csvText = e.target.result;
+                try {
+                    processCSV(csvText);
+                    showAlert("Importar CSV", "Productos importados/actualizados desde CSV correctamente.");
+                    saveProductsToLocalStorage();
+                    navigateToView('panel-control'); 
+                } catch (error) {
+                    console.error("Error procesando CSV:", error);
+                    showAlert("Error al Importar", "Hubo un problema al procesar el archivo CSV. Asegúrate de que el formato sea correcto. Detalles: " + error.message);
+                }
+            };
+            reader.onerror = function() {
+                showAlert("Error al Importar", "No se pudo leer el archivo seleccionado.");
+            };
+            reader.readAsText(file, 'UTF-8'); // Specify UTF-8 encoding
+        }
+        event.target.value = null; 
+    }
+    
+    // Basic CSV parser (handles quoted fields with commas and escaped quotes)
+    function parseCSVLine(line) {
+        const result = [];
+        let currentField = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && i + 1 < line.length && line[i+1] === '"') { // Escaped quote
+                    currentField += '"';
+                    i++; // Skip next quote
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                result.push(currentField.trim());
+                currentField = '';
+            } else {
+                currentField += char;
+            }
+        }
+        result.push(currentField.trim()); // Add last field
+        return result;
+    }
+
+
+    function processCSV(csvText) {
+        const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== ''); // Filter out empty lines
+        if (lines.length < 2) {
+            throw new Error("El archivo CSV está vacío o no tiene cabeceras y datos.");
+        }
+        
+        const rawHeaders = parseCSVLine(lines[0]);
+        const headers = rawHeaders.map(h => h.trim().toLowerCase().replace(/"/g, ''));
+        
+        const headerMap = {
+            "id": "id", "nombre_producto": "nombre_producto", "nombre producto": "nombre_producto", "nombre": "nombre_producto",
+            "categoria": "categoria", "línea": "linea", "linea": "linea",
+            "codigo_producto": "codigo_producto", "codigo producto": "codigo_producto", "sku": "codigo_producto",
+            "stock_actual": "stock_actual", "stock actual": "stock_actual", "stock": "stock_actual", "cantidad": "stock_actual",
+            "precio_venta": "precio_venta", "precio venta": "precio_venta", "precio": "precio_venta",
+            "precio_costo": "precio_costo", "precio costo": "precio_costo", "costo": "precio_costo",
+            "capacidad_litros": "capacidad_litros", "capacidad (l)": "capacidad_litros", "capacidad": "capacidad_litros",
+            "comensales": "comensales",
+            "dimensiones_cm": "dimensiones_cm", "dimensiones (cm)": "dimensiones_cm", "dimensiones": "dimensiones_cm",
+            "material_recubrimiento": "material_recubrimiento", "material": "material_recubrimiento",
+            "color_especifico": "color_especifico", "color": "color_especifico",
+            "origen_producto": "origen_producto", "origen": "origen_producto",
+            "fecha_ingreso": "fecha_ingreso", "fecha ingreso": "fecha_ingreso",
+            "imagen_url": "imagen_url", "imagen": "imagen_url", "url imagen": "imagen_url",
+            "descripcion_atractiva": "descripcion_atractiva", "descripcion": "descripcion_atractiva",
+            "notas_adicionales": "notas_adicionales", "notas": "notas_adicionales",
+            "fecha_adicion": "fecha_adicion"
+        };
+
+        const importedProducts = [];
+        let maxIdInCsv = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim() === "") continue;
+            
+            const values = parseCSVLine(lines[i]);
+            const productData = {};
+            let hasRequiredFields = false;
+
+            headers.forEach((header, index) => {
+                const propName = headerMap[header];
+                if (propName && values[index] !== undefined) {
+                    let value = values[index]; // Already trimmed by parseCSVLine
+                    
+                    if (["stock_actual", "comensales"].includes(propName)) value = value === "" ? 0 : parseInt(value, 10) || 0;
+                    else if (["precio_venta", "capacidad_litros"].includes(propName)) value = value === "" ? 0 : parseFloat(value) || 0;
+                    else if (propName === "precio_costo") value = value === "" ? null : parseFloat(value) || null;
+                    else if (propName === "id") value = value === "" ? null : parseInt(value, 10) || null;
+
+                    productData[propName] = value;
+                    if (propName === "nombre_producto" && productData[propName]) hasRequiredFields = true;
+                }
+            });
+
+            if (!hasRequiredFields || !productData.nombre_producto) {
+                console.warn(`Línea ${i+1} omitida: falta nombre del producto o datos esenciales.`);
+                continue;
+            }
+
+            productData.categoria = productData.categoria || "Otro";
+            productData.linea = productData.linea || "Sin Línea Específica";
+            productData.fecha_ingreso = productData.fecha_ingreso || new Date().toISOString().split('T')[0];
+            productData.fecha_adicion = productData.fecha_adicion || new Date().toISOString();
+            
+            if (productData.id !== null && typeof productData.id === 'number') { // Check if ID is a valid number
+                maxIdInCsv = Math.max(maxIdInCsv, productData.id);
+            }
+            importedProducts.push(productData);
+        }
+
+        if (importedProducts.length === 0) {
+            throw new Error("No se encontraron productos válidos en el archivo CSV.");
+        }
+
+        importedProducts.forEach(importedProd => {
+            if (importedProd.id !== null && typeof importedProd.id === 'number') {
+                const existingProductIndex = products.findIndex(p => p.id === importedProd.id);
+                if (existingProductIndex > -1) {
+                    products[existingProductIndex] = { ...products[existingProductIndex], ...importedProd };
+                } else {
+                    products.push(importedProd);
+                }
+            } else {
+                importedProd.id = ++productIdCounter;
+                products.push(importedProd);
+            }
+            if (importedProd.categoria && !productCategories.includes(importedProd.categoria)) productCategories.push(importedProd.categoria);
+            if (importedProd.linea && !productLines.includes(importedProd.linea)) productLines.push(importedProd.linea);
+        });
+        
+        productIdCounter = Math.max(productIdCounter, maxIdInCsv, ...products.map(p => (typeof p.id === 'number' ? p.id : 0) ));
+        populateSelects();
+    }
+
+    // --- Compartir por WhatsApp ---
+    function prepareShareProduct(productId) {
+        productToShareId = productId;
+        viewProductDetails(productId); // This will open the modal
+    }
+
+    function shareProductOnWhatsApp() {
+        if (productToShareId === null) return;
+        const product = products.find(p => p.id === productToShareId);
+        if (product) {
+            let message = `¡Hola! Te comparto este producto:\n\n`;
+            message += `*${product.nombre_producto}*\n`;
+            if (product.descripcion_atractiva) message += `${product.descripcion_atractiva}\n`;
+            message += `Precio: $${(parseFloat(product.precio_venta) || 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}\n`;
+            if (product.stock_actual > 0) message += `Stock: ${product.stock_actual} unidades\n`;
+            else message += `Stock: Agotado\n`;
+            if (product.codigo_producto) message += `Código: ${product.codigo_producto}\n`;
+            if (product.imagen_url) message += `\nVer imagen: ${product.imagen_url}`;
+
+
+            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+        // productToShareId = null; // Keep it, modal close will clear it
+    }
+
+
+    // Hacer funciones globalmente accesibles si son llamadas por atributos de evento HTML en línea
+    window.viewProductDetails = viewProductDetails;
+    window.navigateToView = navigateToView;
+    window.confirmDeleteProduct = confirmDeleteProduct;
+    window.closeModal = closeModal; 
+    window.handleImportCSV = handleImportCSV; 
+    window.prepareShareProduct = prepareShareProduct;
+
+    </script>
+</body>
+</html>
